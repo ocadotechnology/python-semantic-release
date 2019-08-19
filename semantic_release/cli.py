@@ -22,7 +22,10 @@ _common_options = [
     click.option('--post', is_flag=True, help='Post changelog.'),
     click.option('--retry', is_flag=True, help='Retry the same release, do not bump.'),
     click.option('--noop', is_flag=True,
-                 help='No-operations mode, finds the new version number without changing it.')
+                 help='No-operations mode, finds the new version number without changing it.'),
+    click.option('--branch', help='Travis branch the build is on.'),
+    click.option('--build', help='Travis build number for beta releases.'),
+    click.option('--dev', help='Whether or not the build is happening on the dev server.'),
 ]
 
 
@@ -45,40 +48,66 @@ def version(**kwargs):
         click.echo('Retrying publication of the same version...')
     else:
         click.echo('Creating new version..')
-    current_version = get_current_version()
+
+    current_master_version = get_current_version()
+
+    branch = kwargs.get("branch")
+    build = kwargs.get("build")
+    deploy_to_dev = kwargs.get("dev")
+
+    if deploy_to_dev == "true":
+        current_version = current_master_version + ".dev" + build
+    elif branch == "development":
+        current_version = current_master_version + ".b" + build
+    else:
+        current_version = current_master_version
+
     click.echo('Current version: {0}'.format(current_version))
-    level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
-    new_version = get_new_version(current_version, level_bump)
 
-    if new_version == current_version and not retry:
-        click.echo(click.style('No release will be made.', fg='yellow'))
-        return False
+    if deploy_to_dev == "false":
+        level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
+        bumped_version = get_new_version(current_master_version, level_bump)
 
-    if kwargs['noop'] is True:
-        click.echo('{0} Should have bumped from {1} to {2}.'.format(
-            click.style('No operation mode.', fg='yellow'),
-            current_version,
-            new_version
-        ))
-        return False
+        if build:
+            new_version = bumped_version + ".b" + build
+        else:
+            new_version = bumped_version
 
-    if config.getboolean('semantic_release', 'check_build_status'):
-        click.echo('Checking build status..')
-        owner, name = get_repository_owner_and_name()
-        if not check_build_status(owner, name, get_current_head_hash()):
-            click.echo(click.style('The build has failed', 'red'))
+        if new_version == current_version and not retry:
+            click.echo(click.style('No release will be made.', fg='yellow'))
             return False
-        click.echo(click.style('The build was a success, continuing the release', 'green'))
 
-    if retry:
-        # No need to make changes to the repo, we're just retrying.
-        return True
+        if kwargs['noop'] is True:
+            click.echo('{0} Should have bumped from {1} to {2}.'.format(
+                click.style('No operation mode.', fg='yellow'),
+                current_version,
+                new_version
+            ))
+            return False
 
-    if config.get('semantic_release', 'version_source') == 'commit':
-        set_new_version(new_version)
-        commit_new_version(new_version)
-    tag_new_version(new_version)
-    click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
+        if config.getboolean('semantic_release', 'check_build_status'):
+            click.echo('Checking build status..')
+            owner, name = get_repository_owner_and_name()
+            if not check_build_status(owner, name, get_current_head_hash()):
+                click.echo(click.style('The build has failed', 'red'))
+                return False
+            click.echo(click.style('The build was a success, continuing the release', 'green'))
+
+        if retry:
+            # No need to make changes to the repo, we're just retrying.
+            return True
+
+        if config.get('semantic_release', 'version_source') == 'commit':
+            set_new_version(bumped_version)
+            commit_new_version(new_version)
+        tag_new_version(new_version)
+        click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
+
+    else:
+        commit_new_version(current_version)
+        tag_new_version(current_version)
+        click.echo('Not bumping as this is a dev build.')
+
     return True
 
 
@@ -138,44 +167,47 @@ def publish(**kwargs):
         new_version = get_new_version(current_version, level_bump)
     owner, name = get_repository_owner_and_name()
 
-    ci_checks.check('master')
-    checkout('master')
+    branch = kwargs.get("branch")
 
-    if version(**kwargs):
-        push_new_version(
-            gh_token=os.environ.get('GH_TOKEN'),
-            owner=owner,
-            name=name
+    if branch:
+        ci_checks.check(branch)
+        checkout(branch)
+    else:
+        ci_checks.check('master')
+        checkout('master')
+
+    push_new_version(
+        gh_token=os.environ.get('GH_TOKEN'),
+        owner=owner,
+        name=name
+    )
+
+    if config.getboolean('semantic_release', 'upload_to_pypi'):
+        upload_to_pypi(
+            username=os.environ.get('PYPI_USERNAME'),
+            password=os.environ.get('PYPI_PASSWORD'),
+            # We are retrying, so we don't want errors for files that are already on PyPI.
+            skip_existing=retry,
         )
 
-        if config.getboolean('semantic_release', 'upload_to_pypi'):
-            upload_to_pypi(
-                username=os.environ.get('PYPI_USERNAME'),
-                password=os.environ.get('PYPI_PASSWORD'),
-                # We are retrying, so we don't want errors for files that are already on PyPI.
-                skip_existing=retry,
+    if check_token():
+        click.echo('Updating changelog')
+        try:
+            log = generate_changelog(current_version, new_version)
+            post_changelog(
+                owner,
+                name,
+                new_version,
+                markdown_changelog(new_version, log, header=False)
             )
+        except GitError:
+            click.echo(click.style('Posting changelog failed.', 'red'), err=True)
 
-        if check_token():
-            click.echo('Updating changelog')
-            try:
-                log = generate_changelog(current_version, new_version)
-                post_changelog(
-                    owner,
-                    name,
-                    new_version,
-                    markdown_changelog(new_version, log, header=False)
-                )
-            except GitError:
-                click.echo(click.style('Posting changelog failed.', 'red'), err=True)
-
-        else:
-            click.echo(
-                click.style('Missing token: cannot post changelog', 'red'), err=True)
-
-        click.echo(click.style('New release published', 'green'))
     else:
-        click.echo('Version failed, no release will be published.', err=True)
+        click.echo(
+            click.style('Missing token: cannot post changelog', 'red'), err=True)
+
+    click.echo(click.style('New release published', 'green'))
 
 
 #
