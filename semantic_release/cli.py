@@ -49,16 +49,16 @@ def version(**kwargs):
     else:
         click.echo('Creating new version..')
 
-    current_master_version = get_current_version()
-
     branch = kwargs.get("branch")
     build = kwargs.get("build")
     deploy_to_dev = kwargs.get("dev")
 
+    current_master_version = get_current_version()
+
     if deploy_to_dev == "true":
         current_version = current_master_version + ".dev" + build
     elif branch == "development":
-        current_version = current_master_version + ".b" + build
+        current_version = get_current_version(tag=True)
     else:
         current_version = current_master_version
 
@@ -154,7 +154,18 @@ def publish(**kwargs):
     """
     Runs the version task before pushing to git and uploading to pypi.
     """
-    current_version = get_current_version()
+    branch = kwargs.get("branch")
+    build = kwargs.get("build")
+    deploy_to_dev = kwargs.get("dev")
+
+    current_master_version = get_current_version()
+
+    if deploy_to_dev == "true":
+        current_version = current_master_version + ".dev" + build
+    elif branch == "development":
+        current_version = get_current_version(tag=True)
+    else:
+        current_version = current_master_version
     click.echo('Current version: {0}'.format(current_version))
     retry = kwargs.get("retry")
     if retry:

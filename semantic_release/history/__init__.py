@@ -3,21 +3,25 @@ import re
 import semver
 
 from ..settings import config
-from ..vcs_helpers import get_commit_log, get_last_version
+from ..vcs_helpers import get_commit_log, get_last_master_version, get_last_beta_version
 from .logs import evaluate_version_bump  # noqa
 
 from .parser_angular import parse_commit_message as angular_parser  # noqa isort:skip
 from .parser_tag import parse_commit_message as tag_parser  # noqa isort:skip
 
 
-def get_current_version_by_tag():
+def get_current_version_by_tag(beta_version=False):
     """
     Finds the current version of the package in the current working directory.
     Check tags rather than config file. return 0.0.0 if fails
 
     :return: A string with the version number.
     """
-    version = get_last_version()
+    if beta_version:
+        version = get_last_beta_version()
+    else:
+        version = get_last_master_version()
+
     if version:
         return version
     else:
@@ -36,9 +40,9 @@ def get_current_version_by_config_file():
         ).group(1)
 
 
-def get_current_version():
-    if config.get('semantic_release', 'version_source') == 'tag':
-        return get_current_version_by_tag()
+def get_current_version(tag=False):
+    if tag:
+        return get_current_version_by_tag(beta_version=True)
     return get_current_version_by_config_file()
 
 
@@ -62,6 +66,10 @@ def get_previous_version(version):
 
     :param version: A string with the version number.
     """
+    if ".b" in version:
+        pattern = r'v?(\d+\.\d+\.\d+\.b\d+)'
+    else:
+        pattern = r'v?(\d+.\d+.\d+)'
     found_version = False
     for commit_hash, commit_message in get_commit_log():
         if version in commit_message:
@@ -69,11 +77,14 @@ def get_previous_version(version):
             continue
 
         if found_version:
-            matches = re.match(r'v?(\d+.\d+.\d+)', commit_message)
+            matches = re.match(pattern, commit_message)
             if matches:
                 return matches.group(1).strip()
 
-    return get_last_version([version, 'v{}'.format(version)])
+    if ".b" in version:
+        return get_last_beta_version([version, 'v{}'.format(version)])
+    else:
+        return get_last_master_version([version, 'v{}'.format(version)])
 
 
 def set_new_version(new_version):

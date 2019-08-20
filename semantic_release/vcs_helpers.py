@@ -23,7 +23,17 @@ def get_commit_log(from_rev=None):
         yield (commit.hexsha, commit.message)
 
 
-def get_last_version(skip_tags=None):
+def get_last_master_version(skip_tags=None):
+    pattern = 'v\d+\.\d+\.\d+'
+    return get_last_version(pattern, skip_tags)
+
+
+def get_last_beta_version(skip_tags=None):
+    pattern = 'v\d+\.\d+\.\d+\.b\d+'
+    return get_last_version(pattern, skip_tags)
+
+
+def get_last_version(pattern, skip_tags=None):
     """
     return last version from repo tags
 
@@ -37,7 +47,7 @@ def get_last_version(skip_tags=None):
         return x.commit.committed_date
 
     for i in sorted(repo.tags, reverse=True, key=version_finder):
-        if re.match('v\d+\.\d+\.\d+', i.name):
+        if re.match(pattern, i.name):
             if i.name in skip_tags:
                 continue
             return i.name[1:]
