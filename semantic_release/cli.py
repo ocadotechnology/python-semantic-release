@@ -167,14 +167,6 @@ def publish(**kwargs):
         current_version = current_master_version
     click.echo('Current version: {0}'.format(current_version))
     retry = kwargs.get("retry")
-    if retry:
-        # The "new" version will actually be the current version, and the
-        # "current" version will be the previous version.
-        new_version = current_version
-        current_version = get_previous_version(current_version)
-    else:
-        level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
-        new_version = get_new_version(current_version, level_bump)
     owner, name = get_repository_owner_and_name()
 
     branch = kwargs.get("branch")
@@ -199,23 +191,6 @@ def publish(**kwargs):
             # We are retrying, so we don't want errors for files that are already on PyPI.
             skip_existing=retry,
         )
-
-    if check_token():
-        click.echo('Updating changelog')
-        try:
-            log = generate_changelog(current_version, new_version)
-            post_changelog(
-                owner,
-                name,
-                new_version,
-                markdown_changelog(new_version, log, header=False)
-            )
-        except GitError:
-            click.echo(click.style('Posting changelog failed.', 'red'), err=True)
-
-    else:
-        click.echo(
-            click.style('Missing token: cannot post changelog', 'red'), err=True)
 
     click.echo(click.style('New release published', 'green'))
 
