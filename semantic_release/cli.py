@@ -104,7 +104,6 @@ def version(**kwargs):
         click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
 
     else:
-        commit_new_version(current_version)
         tag_new_version(current_version)
         click.echo('Not bumping as this is a dev build.')
 
