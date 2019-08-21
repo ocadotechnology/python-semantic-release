@@ -154,15 +154,14 @@ def publish(**kwargs):
     Runs the version task before pushing to git and uploading to pypi.
     """
     branch = kwargs.get("branch")
-    build = kwargs.get("build")
     deploy_to_dev = kwargs.get("dev")
 
     current_master_version = get_current_version()
 
     if deploy_to_dev == "true":
-        current_version = get_current_version(tag=True)
+        current_version = get_current_version(tag=True, dev_version=True)
     elif branch == "development":
-        current_version = get_current_version(tag=True)
+        current_version = get_current_version(tag=True, beta_version=True)
     else:
         current_version = current_master_version
     click.echo('Current version: {0}'.format(current_version))
@@ -171,6 +170,8 @@ def publish(**kwargs):
 
     ci_checks.check(branch)
     checkout(branch)
+
+    click.echo("BRANCH: " + branch)
 
     push_new_version(
         branch,
