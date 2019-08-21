@@ -33,6 +33,11 @@ def get_last_beta_version(skip_tags=None):
     return get_last_version(pattern, skip_tags)
 
 
+def get_last_dev_version(skip_tags=None):
+    pattern = 'v\d+\.\d+\.\d+\.dev\d+'
+    return get_last_version(pattern, skip_tags)
+
+
 def get_last_version(pattern, skip_tags=None):
     """
     return last version from repo tags

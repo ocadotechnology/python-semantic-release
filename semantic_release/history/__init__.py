@@ -3,21 +3,24 @@ import re
 import semver
 
 from ..settings import config
-from ..vcs_helpers import get_commit_log, get_last_master_version, get_last_beta_version
+from ..vcs_helpers import get_commit_log, get_last_master_version,\
+    get_last_beta_version, get_last_dev_version
 from .logs import evaluate_version_bump  # noqa
 
 from .parser_angular import parse_commit_message as angular_parser  # noqa isort:skip
 from .parser_tag import parse_commit_message as tag_parser  # noqa isort:skip
 
 
-def get_current_version_by_tag(beta_version=False):
+def get_current_version_by_tag(beta_version=False, dev_version=False):
     """
     Finds the current version of the package in the current working directory.
     Check tags rather than config file. return 0.0.0 if fails
 
     :return: A string with the version number.
     """
-    if beta_version:
+    if dev_version:
+        version = get_last_dev_version()
+    elif beta_version:
         version = get_last_beta_version()
     else:
         version = get_last_master_version()
@@ -40,9 +43,14 @@ def get_current_version_by_config_file():
         ).group(1)
 
 
-def get_current_version(tag=False):
+def get_current_version(tag=False, beta_version=False, dev_version=False):
     if tag:
-        return get_current_version_by_tag(beta_version=True)
+        if dev_version:
+            return get_current_version_by_tag(dev_version=True)
+        elif beta_version:
+            return get_current_version_by_tag(beta_version=True)
+        else:
+            return get_current_version_by_tag()
     return get_current_version_by_config_file()
 
 
@@ -66,7 +74,9 @@ def get_previous_version(version):
 
     :param version: A string with the version number.
     """
-    if ".b" in version:
+    if ".dev" in version:
+        pattern = r'v?(\d+\.\d+\.\d+\.dev\d+)'
+    elif ".b" in version:
         pattern = r'v?(\d+\.\d+\.\d+\.b\d+)'
     else:
         pattern = r'v?(\d+.\d+.\d+)'
@@ -81,7 +91,9 @@ def get_previous_version(version):
             if matches:
                 return matches.group(1).strip()
 
-    if ".b" in version:
+    if ".dev" in version:
+        return get_last_dev_version([version, 'v{}'.format(version)])
+    elif ".b" in version:
         return get_last_beta_version([version, 'v{}'.format(version)])
     else:
         return get_last_master_version([version, 'v{}'.format(version)])
