@@ -104,9 +104,10 @@ def tag_new_version(version):
     return repo.git.tag('-a', 'v{0}'.format(version), m='v{0}'.format(version))
 
 
-def push_new_version(gh_token=None, owner=None, name=None):
+def push_new_version(branch, gh_token=None, owner=None, name=None):
     """
     Runs git push and git push --tags
+    :param branch: The branch the version should be pushed to.
     :param gh_token: Github token used to push.
     :param owner: Organisation or user that owns the repository.
     :param name: Name of repository.
@@ -120,8 +121,8 @@ def push_new_version(gh_token=None, owner=None, name=None):
         )
 
     try:
-        repo.git.push(server, 'master')
-        repo.git.push('--tags', server, 'master')
+        repo.git.push(server, branch)
+        repo.git.push('--tags', server, branch)
     except GitCommandError as error:
         message = str(error)
         if gh_token:

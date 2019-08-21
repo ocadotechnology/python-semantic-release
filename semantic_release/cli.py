@@ -169,16 +169,11 @@ def publish(**kwargs):
     retry = kwargs.get("retry")
     owner, name = get_repository_owner_and_name()
 
-    branch = kwargs.get("branch")
-
-    if branch:
-        ci_checks.check(branch)
-        checkout(branch)
-    else:
-        ci_checks.check('master')
-        checkout('master')
+    ci_checks.check(branch)
+    checkout(branch)
 
     push_new_version(
+        branch,
         gh_token=os.environ.get('GH_TOKEN'),
         owner=owner,
         name=name
