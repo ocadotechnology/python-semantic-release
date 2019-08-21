@@ -113,7 +113,7 @@ def set_new_version(new_version):
         content = fr.read()
 
     content = re.sub(
-        r'{0} ?= ?["\']\d+\.\d+(?:\.\d+)?["\']'.format(variable),
+        r'{0} ?= ?["\']\d+\.\d+\.\d+((\.dev|b)+\d+)?["\']'.format(variable),
         '{0} = \'{1}\''.format(variable, new_version),
         content
     )
