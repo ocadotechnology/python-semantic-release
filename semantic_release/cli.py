@@ -160,7 +160,7 @@ def publish(**kwargs):
     current_master_version = get_current_version()
 
     if deploy_to_dev == "true":
-        current_version = current_master_version + ".dev" + build
+        current_version = get_current_version(tag=True)
     elif branch == "development":
         current_version = get_current_version(tag=True)
     else:
