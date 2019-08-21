@@ -154,41 +154,31 @@ def publish(**kwargs):
     Runs the version task before pushing to git and uploading to pypi.
     """
     branch = kwargs.get("branch")
-    deploy_to_dev = kwargs.get("dev")
-
-    current_master_version = get_current_version()
-
-    if deploy_to_dev == "true":
-        current_version = get_current_version(tag=True, dev_version=True)
-    elif branch == "development":
-        current_version = get_current_version(tag=True, beta_version=True)
-    else:
-        current_version = current_master_version
-    click.echo('Current version: {0}'.format(current_version))
     retry = kwargs.get("retry")
     owner, name = get_repository_owner_and_name()
 
     ci_checks.check(branch)
     checkout(branch)
 
-    click.echo("BRANCH: " + branch)
-
-    push_new_version(
-        branch,
-        gh_token=os.environ.get('GH_TOKEN'),
-        owner=owner,
-        name=name
-    )
-
-    if config.getboolean('semantic_release', 'upload_to_pypi'):
-        upload_to_pypi(
-            username=os.environ.get('PYPI_USERNAME'),
-            password=os.environ.get('PYPI_PASSWORD'),
-            # We are retrying, so we don't want errors for files that are already on PyPI.
-            skip_existing=retry,
+    if version(**kwargs):
+        push_new_version(
+            branch,
+            gh_token=os.environ.get('GH_TOKEN'),
+            owner=owner,
+            name=name,
         )
 
-    click.echo(click.style('New release published', 'green'))
+        if config.getboolean('semantic_release', 'upload_to_pypi'):
+            upload_to_pypi(
+                username=os.environ.get('PYPI_USERNAME'),
+                password=os.environ.get('PYPI_PASSWORD'),
+                # We are retrying, so we don't want errors for files that are already on PyPI.
+                skip_existing=retry,
+            )
+
+        click.echo(click.style('New release published', 'green'))
+    else:
+        click.echo('Version failed, no release will be published.', err=True)
 
 
 #
