@@ -1,11 +1,11 @@
 import os
-import sys
+import re
 
 import click
+import sys
 
 from semantic_release import ci_checks
-from semantic_release.errors import GitError, ImproperConfigurationError
-
+from semantic_release.errors import ImproperConfigurationError
 from .history import (evaluate_version_bump, get_current_version, get_new_version,
                       get_previous_version, set_new_version)
 from .history.logs import CHANGELOG_SECTIONS, generate_changelog, markdown_changelog
@@ -13,7 +13,8 @@ from .hvcs import check_build_status, check_token, post_changelog
 from .pypi import upload_to_pypi
 from .settings import config
 from .vcs_helpers import (checkout, commit_new_version, get_current_head_hash,
-                          get_repository_owner_and_name, push_new_version, tag_new_version)
+                          get_repository_owner_and_name, push_new_version,
+                          tag_new_version)
 
 _common_options = [
     click.option('--major', 'force_level', flag_value='major', help='Force major version.'),
@@ -69,7 +70,7 @@ def version(**kwargs):
         bumped_version = get_new_version(current_master_version, level_bump)
 
         if build:
-            new_version = bumped_version + ".b" + build
+            new_version = bumped_version + "b" + build
         else:
             new_version = bumped_version
 
@@ -98,13 +99,14 @@ def version(**kwargs):
             return True
 
         if config.get('semantic_release', 'version_source') == 'commit':
-            set_new_version(bumped_version)
             commit_new_version(new_version)
         tag_new_version(new_version)
+        set_new_version(new_version)
         click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
 
     else:
         tag_new_version(current_version)
+        set_new_version(current_version)
         click.echo('Not bumping as this is a dev build.')
 
     return True
@@ -179,6 +181,17 @@ def publish(**kwargs):
         click.echo(click.style('New release published', 'green'))
     else:
         click.echo('Version failed, no release will be published.', err=True)
+
+    current_version = get_current_version()
+
+    if "dev" in current_version:
+        master_version = current_version.split("dev")[0][:-1]
+    elif "b" in current_version:
+        master_version = current_version.split("b")[0]
+    else:
+        master_version = current_version
+
+    set_new_version(master_version)
 
 
 #
