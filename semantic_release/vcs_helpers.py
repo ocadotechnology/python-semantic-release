@@ -120,6 +120,9 @@ def push_new_version(branch, gh_token=None, owner=None, name=None):
             repo='github.com/{owner}/{name}.git'.format(owner=owner, name=name)
         )
 
+    print(owner)
+    print(name)
+
     try:
         repo.git.push(server, branch)
         repo.git.push('--tags', server, branch)
