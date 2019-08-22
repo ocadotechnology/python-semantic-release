@@ -62,7 +62,7 @@ def version(**kwargs):
         if "dev" in current_version:
             master_version = current_version.split("dev")[0][:-1]
         elif "b" in current_version:
-            master_version = current_version.split("b")[0]
+            master_version = current_version.split("b")[0][:-1]
         else:
             master_version = current_version
 
