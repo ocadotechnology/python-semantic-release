@@ -76,7 +76,7 @@ def get_previous_version(version):
     """
     if ".dev" in version:
         pattern = r'v?(\d+\.\d+\.\d+\.dev\d+)'
-    elif ".b" in version:
+    elif "b" in version:
         pattern = r'v?(\d+\.\d+\.\d+\.b\d+)'
     else:
         pattern = r'v?(\d+.\d+.\d+)'
@@ -93,7 +93,7 @@ def get_previous_version(version):
 
     if ".dev" in version:
         return get_last_dev_version([version, 'v{}'.format(version)])
-    elif ".b" in version:
+    elif "b" in version:
         return get_last_beta_version([version, 'v{}'.format(version)])
     else:
         return get_last_master_version([version, 'v{}'.format(version)])

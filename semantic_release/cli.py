@@ -62,25 +62,19 @@ def version(**kwargs):
         if "dev" in current_version:
             master_version = current_version.split("dev")[0][:-1]
         elif "b" in current_version:
-            master_version = current_version.split("b")[0][:-1]
+            master_version = current_version.split("b")[0]
         else:
             master_version = current_version
-
-        click.echo('Master version: {0}'.format(master_version))
 
         set_new_version(master_version)
 
         level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
         bumped_version = get_new_version(master_version, level_bump)
 
-        click.echo('Bumped version: {0}'.format(bumped_version))
-
         if build:
             new_version = bumped_version + "b" + build
         else:
             new_version = bumped_version
-
-        click.echo('New version: {0}'.format(new_version))
 
         if new_version == current_version and not retry:
             click.echo(click.style('No release will be made.', fg='yellow'))
