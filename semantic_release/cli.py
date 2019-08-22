@@ -1,5 +1,4 @@
 import os
-import re
 
 import click
 import sys
@@ -12,7 +11,7 @@ from .history.logs import CHANGELOG_SECTIONS, generate_changelog, markdown_chang
 from .hvcs import check_build_status, check_token, post_changelog
 from .pypi import upload_to_pypi
 from .settings import config
-from .vcs_helpers import (checkout, commit_new_version, get_current_head_hash,
+from .vcs_helpers import (checkout, get_current_head_hash,
                           get_repository_owner_and_name, push_new_version,
                           tag_new_version)
 
