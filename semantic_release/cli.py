@@ -50,24 +50,26 @@ def version(**kwargs):
     else:
         click.echo('Creating new version..')
 
-    branch = kwargs.get("branch")
     build = kwargs.get("build")
     deploy_to_dev = kwargs.get("dev")
 
-    current_master_version = get_current_version()
-
-    if deploy_to_dev == "true":
-        current_version = current_master_version + ".dev" + build
-    elif branch == "development":
-        current_version = get_current_version(tag=True)
-    else:
-        current_version = current_master_version
+    current_version = get_current_version()
 
     click.echo('Current version: {0}'.format(current_version))
 
     if deploy_to_dev == "false":
+
+        if "dev" in current_version:
+            master_version = current_version.split("dev")[0][:-1]
+        elif "b" in current_version:
+            master_version = current_version.split("b")[0]
+        else:
+            master_version = current_version
+
+        set_new_version(master_version)
+
         level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
-        bumped_version = get_new_version(current_master_version, level_bump)
+        bumped_version = get_new_version(master_version, level_bump)
 
         if build:
             new_version = bumped_version + "b" + build
@@ -179,17 +181,6 @@ def publish(**kwargs):
         click.echo(click.style('New release published', 'green'))
     else:
         click.echo('Version failed, no release will be published.', err=True)
-
-    current_version = get_current_version()
-
-    if "dev" in current_version:
-        master_version = current_version.split("dev")[0][:-1]
-    elif "b" in current_version:
-        master_version = current_version.split("b")[0]
-    else:
-        master_version = current_version
-
-    set_new_version(master_version)
 
 
 #
