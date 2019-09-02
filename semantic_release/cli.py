@@ -56,17 +56,16 @@ def version(**kwargs):
 
     click.echo('Current version: {0}'.format(current_version))
 
+    if "dev" in current_version:
+        master_version = current_version.split("dev")[0][:-1]
+    elif "b" in current_version:
+        master_version = current_version.split("b")[0]
+    else:
+        master_version = current_version
+
+    set_new_version(master_version)
+
     if deploy_to_dev == "false":
-
-        if "dev" in current_version:
-            master_version = current_version.split("dev")[0][:-1]
-        elif "b" in current_version:
-            master_version = current_version.split("b")[0]
-        else:
-            master_version = current_version
-
-        set_new_version(master_version)
-
         level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
         bumped_version = get_new_version(master_version, level_bump)
 
@@ -99,14 +98,14 @@ def version(**kwargs):
             # No need to make changes to the repo, we're just retrying.
             return True
 
-        tag_new_version(new_version)
-        set_new_version(new_version)
         click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
 
     else:
-        tag_new_version(current_version)
-        set_new_version(current_version)
+        new_version = master_version + ".dev" + build
         click.echo('Not bumping as this is a dev build.')
+
+    tag_new_version(new_version)
+    set_new_version(new_version)
 
     return True
 
