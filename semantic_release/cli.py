@@ -50,6 +50,7 @@ def version(**kwargs):
         click.echo('Creating new version..')
 
     build = kwargs.get("build")
+    branch = kwargs.get("branch")
     deploy_to_dev = kwargs.get("dev")
 
     current_version = get_current_version()
@@ -69,7 +70,7 @@ def version(**kwargs):
         level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
         bumped_version = get_new_version(master_version, level_bump)
 
-        if build:
+        if branch == "development":
             new_version = bumped_version + "b" + build
         else:
             new_version = bumped_version
