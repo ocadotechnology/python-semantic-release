@@ -53,6 +53,10 @@ def version(**kwargs):
     branch = kwargs.get("branch")
     deploy_to_dev = kwargs.get("dev")
 
+    click.echo(build)
+    click.echo(branch)
+    click.echo(deploy_to_dev)
+
     current_version = get_current_version()
 
     click.echo('Current version: {0}'.format(current_version))
