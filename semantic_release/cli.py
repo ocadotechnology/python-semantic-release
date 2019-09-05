@@ -53,10 +53,6 @@ def version(**kwargs):
     branch = kwargs.get("branch")
     deploy_to_dev = kwargs.get("dev")
 
-    click.echo(build)
-    click.echo(branch)
-    click.echo(deploy_to_dev)
-
     current_version = get_current_version()
 
     click.echo('Current version: {0}'.format(current_version))
@@ -108,6 +104,8 @@ def version(**kwargs):
     else:
         new_version = master_version + ".dev" + build
         click.echo('Not bumping as this is a dev build.')
+
+    click.echo('{0} Committing and tagging new version: '.format(new_version))
 
     commit_new_version(new_version)
     tag_new_version(new_version)
