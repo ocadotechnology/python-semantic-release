@@ -13,7 +13,7 @@ from .pypi import upload_to_pypi
 from .settings import config
 from .vcs_helpers import (checkout, get_current_head_hash,
                           get_repository_owner_and_name, push_new_version,
-                          tag_new_version)
+                          tag_new_version, commit_new_version)
 
 _common_options = [
     click.option('--major', 'force_level', flag_value='major', help='Force major version.'),
@@ -104,6 +104,7 @@ def version(**kwargs):
         new_version = master_version + ".dev" + build
         click.echo('Not bumping as this is a dev build.')
 
+    commit_new_version(new_version)
     tag_new_version(new_version)
     set_new_version(new_version)
 
