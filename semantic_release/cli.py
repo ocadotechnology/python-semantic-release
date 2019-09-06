@@ -66,53 +66,72 @@ def version(**kwargs):
 
     set_new_version(master_version)
 
-    if deploy_to_dev == "false":
-        level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
-        bumped_version = get_new_version(master_version, level_bump)
+    if deploy_to_dev == "true":
+        return deploy_dev_release(master_version, build)
+    elif branch == "development":
+        return deploy_beta_release(master_version, current_version, kwargs, build, retry)
+    elif branch == "master":
+        return deploy_production_release(master_version)
 
-        if branch == "development":
-            new_version = bumped_version + "b" + build
-        else:
-            new_version = bumped_version
+    return True
 
-        if bumped_version == master_version and not retry:
-            click.echo(click.style('No release will be made.', fg='yellow'))
+
+def deploy_dev_release(master_version, build):
+    new_version = master_version + ".dev" + build
+
+    tag_new_version(new_version)
+    set_new_version(new_version)
+
+    click.echo('Not bumping as this is a dev build.')
+
+    return True
+
+
+def deploy_beta_release(master_version, current_version, kwargs, build, retry):
+    level_bump = evaluate_version_bump(current_version, kwargs['force_level'])
+    bumped_version = get_new_version(master_version, level_bump)
+
+    new_version = bumped_version + "b" + build
+
+    if bumped_version == master_version and not retry:
+        click.echo(click.style('No release will be made.', fg='yellow'))
+        return False
+
+    if kwargs['noop'] is True:
+        click.echo('{0} Should have bumped from {1} to {2}.'.format(
+            click.style('No operation mode.', fg='yellow'),
+            current_version,
+            new_version
+        ))
+        return False
+
+    if config.getboolean('semantic_release', 'check_build_status'):
+        click.echo('Checking build status..')
+        owner, name = get_repository_owner_and_name()
+        if not check_build_status(owner, name, get_current_head_hash()):
+            click.echo(click.style('The build has failed', 'red'))
             return False
+        click.echo(click.style('The build was a success, continuing the release', 'green'))
 
-        if kwargs['noop'] is True:
-            click.echo('{0} Should have bumped from {1} to {2}.'.format(
-                click.style('No operation mode.', fg='yellow'),
-                current_version,
-                new_version
-            ))
-            return False
+    if retry:
+        # No need to make changes to the repo, we're just retrying.
+        return True
 
-        if config.getboolean('semantic_release', 'check_build_status'):
-            click.echo('Checking build status..')
-            owner, name = get_repository_owner_and_name()
-            if not check_build_status(owner, name, get_current_head_hash()):
-                click.echo(click.style('The build has failed', 'red'))
-                return False
-            click.echo(click.style('The build was a success, continuing the release', 'green'))
-
-        if retry:
-            # No need to make changes to the repo, we're just retrying.
-            return True
-
-        if config.get('semantic_release', 'version_source') == 'commit':
-            set_new_version(new_version)
-        commit_new_version(new_version)
-        tag_new_version(new_version)
-
-        click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
-
-    else:
-        new_version = master_version + ".dev" + build
-
-        tag_new_version(new_version)
+    if config.get('semantic_release', 'version_source') == 'commit':
         set_new_version(new_version)
+    commit_new_version(new_version)
+    tag_new_version(new_version)
 
-        click.echo('Not bumping as this is a dev build.')
+    click.echo('Bumping with a {0} version to {1}.'.format(level_bump, new_version))
+
+    return True
+
+
+def deploy_production_release(master_version):
+    if config.get('semantic_release', 'version_source') == 'commit':
+        set_new_version(master_version)
+    commit_new_version(master_version)
+    tag_new_version(master_version)
 
     return True
 
