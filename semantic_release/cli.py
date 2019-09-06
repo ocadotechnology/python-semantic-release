@@ -71,7 +71,7 @@ def version(**kwargs):
     elif branch == "development":
         return deploy_beta_release(master_version, current_version, kwargs, build, retry)
     elif branch == "master":
-        return deploy_production_release(master_version)
+        return deploy_production_release(master_version, current_version, retry)
 
     return True
 
@@ -93,7 +93,7 @@ def deploy_beta_release(master_version, current_version, kwargs, build, retry):
 
     new_version = bumped_version + "b" + build
 
-    if bumped_version == master_version and not retry:
+    if new_version_is_not_current_version(master_version, bumped_version) and not retry:
         click.echo(click.style('No release will be made.', fg='yellow'))
         return False
 
@@ -127,13 +127,21 @@ def deploy_beta_release(master_version, current_version, kwargs, build, retry):
     return True
 
 
-def deploy_production_release(master_version):
+def deploy_production_release(master_version, current_version, retry):
+    if new_version_is_not_current_version(current_version, master_version) and not retry:
+        click.echo(click.style('No release will be made.', fg='yellow'))
+        return False
+
     if config.get('semantic_release', 'version_source') == 'commit':
         set_new_version(master_version)
     commit_new_version(master_version)
     tag_new_version(master_version)
 
     return True
+
+
+def new_version_is_not_current_version(current_version, new_version):
+    return current_version == new_version
 
 
 def changelog(**kwargs):
