@@ -75,7 +75,7 @@ def version(**kwargs):
         else:
             new_version = bumped_version
 
-        if new_version == current_version and not retry:
+        if bumped_version == master_version and not retry:
             click.echo(click.style('No release will be made.', fg='yellow'))
             return False
 
