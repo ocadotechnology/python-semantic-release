@@ -36,18 +36,16 @@ setup(
     author_email='me@rolflekang.com',
     description='Automatic semantic versioning for python projects',
     long_description=_read_long_description(),
-    packages=find_packages(exclude='tests'),
+    packages=find_packages(exclude=('tests',)),
     license='MIT',
     install_requires=requirements,
     entry_points='''
         [console_scripts]
-        semantic-release=semantic_release.cli:main
+        semantic-release=semantic_release.cli:entry
     ''',
     include_package_data=True,
     classifiers=[
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
     ]

@@ -1,8 +1,15 @@
-import re
+"""Logs
+"""
+from typing import Optional
+
+import ndebug
 
 from ..errors import UnknownCommitMessageStyleError
 from ..settings import config, current_commit_parser
 from ..vcs_helpers import get_commit_log
+from .parser_helpers import re_breaking
+
+debug = ndebug.create(__name__)
 
 LEVELS = {
     1: 'patch',
@@ -10,12 +17,16 @@ LEVELS = {
     3: 'major',
 }
 
-CHANGELOG_SECTIONS = ['feature', 'fix', 'breaking', 'documentation']
+CHANGELOG_SECTIONS = [
+    'feature',
+    'fix',
+    'breaking',
+    'documentation',
+    'performance',
+]
 
-re_breaking = re.compile('BREAKING CHANGE: (.*)')
 
-
-def evaluate_version_bump(current_version, force=None):
+def evaluate_version_bump(current_version: str, force: str = None) -> Optional[str]:
     """
     Reads git log since last release to find out if should be a major, minor or patch release.
 
@@ -24,6 +35,7 @@ def evaluate_version_bump(current_version, force=None):
     :return: A string with either major, minor or patch if there should be a release. If no release
              is necessary None will be returned.
     """
+    debug('evaluate_version_bump("{}", "{}")'.format(current_version, force))
     if force:
         return force
 
@@ -33,13 +45,14 @@ def evaluate_version_bump(current_version, force=None):
     commit_count = 0
 
     for _hash, commit_message in get_commit_log('v{0}'.format(current_version)):
-        if (current_version in commit_message and
-                config.get('semantic_release', 'version_source') == 'commit'):
+        if commit_message.startswith(current_version):
+            debug('"{}" is commit for {}. breaking loop'.format(commit_message, current_version))
             break
         try:
             message = current_commit_parser()(commit_message)
             changes.append(message[0])
-        except UnknownCommitMessageStyleError:
+        except UnknownCommitMessageStyleError as err:
+            debug('ignored', err)
             pass
 
         commit_count += 1
@@ -53,7 +66,7 @@ def evaluate_version_bump(current_version, force=None):
     return bump
 
 
-def generate_changelog(from_version, to_version=None):
+def generate_changelog(from_version: str, to_version: str = None) -> dict:
     """
     Generates a changelog for the given version.
 
@@ -62,9 +75,15 @@ def generate_changelog(from_version, to_version=None):
     :param to_version: The last version in the changelog.
     :return: a dict with different changelog sections
     """
-
-    changes = {'feature': [], 'fix': [],
-               'documentation': [], 'refactor': [], 'breaking': []}
+    debug('generate_changelog("{}", "{}")'.format(from_version, to_version))
+    changes: dict = {
+        'feature': [],
+        'fix': [],
+        'documentation': [],
+        'refactor': [],
+        'breaking': [],
+        'performance': [],
+    }
 
     found_the_release = to_version is None
 
@@ -89,21 +108,31 @@ def generate_changelog(from_version, to_version=None):
 
             changes[message[1]].append((_hash, message[3][0]))
 
-            if message[3][1] and 'BREAKING CHANGE' in message[3][1]:
-                changes['breaking'].append(
-                    re_breaking.match(message[3][1]).group(1))
+            # Handle breaking change message
+            parts = None
+            if message[0] == 3:
+                # parse footer (standard)
+                if message[3][2] and 'BREAKING CHANGE' in message[3][2]:
+                    parts = re_breaking.match(message[3][2])
+                # parse body (not standard, kept for backwards compatibility)
+                elif message[3][1] and 'BREAKING CHANGE' in message[3][1]:
+                    parts = re_breaking.match(message[3][1])
 
-            if message[3][2] and 'BREAKING CHANGE' in message[3][2]:
-                changes['breaking'].append(
-                    re_breaking.match(message[3][2]).group(1))
+                if parts:
+                    breaking_description = parts.group(1)
+                else:
+                    breaking_description = message[3][0]
 
-        except UnknownCommitMessageStyleError:
+                changes['breaking'].append((_hash, breaking_description))
+
+        except UnknownCommitMessageStyleError as err:
+            debug('Ignoring', err)
             pass
 
     return changes
 
 
-def markdown_changelog(version, changelog, header=False):
+def markdown_changelog(version: str, changelog: dict, header: bool = False) -> str:
     """
     Generates a markdown version of the changelog. Takes a parsed changelog dict from
     generate_changelog.
@@ -113,6 +142,7 @@ def markdown_changelog(version, changelog, header=False):
     :param header: A boolean that decides whether a header should be included or not.
     :return: The markdown formatted changelog.
     """
+    debug('markdown_changelog(version="{}", header={}, changelog=...)'.format(version, header))
     output = ''
     if header:
         output += '## v{0}\n'.format(version)
