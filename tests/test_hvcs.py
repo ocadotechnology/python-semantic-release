@@ -5,13 +5,21 @@ import pytest
 import responses
 
 from semantic_release.errors import ImproperConfigurationError
-from semantic_release.hvcs import Github, check_build_status, check_token, get_hvcs
+from semantic_release.hvcs import (Github, Gitlab, check_build_status, check_token, get_hvcs,
+                                   post_changelog)
 
 from . import mock
+from .mocks.mock_gitlab import mock_gitlab
 
 
-def test_get_hvcs_should_return_github():
+@mock.patch('configparser.ConfigParser.get', return_value='github')
+def test_get_hvcs_should_return_github(mock_get_vcs):
     assert(get_hvcs() == Github)
+
+
+@mock.patch('configparser.ConfigParser.get', return_value='gitlab')
+def test_get_hvcs_should_return_gitlab(mock_get_vcs):
+    assert(get_hvcs() == Gitlab)
 
 
 @mock.patch('semantic_release.hvcs.config.get', lambda *x: 'doesnotexist')
@@ -33,6 +41,13 @@ def test_check_token_should_return_true():
 @mock.patch('os.environ', {})
 def test_check_token_should_return_false():
     assert(check_token() is False)
+
+
+@mock.patch('configparser.ConfigParser.get', return_value='gitlab')
+@mock.patch('os.environ', {'GL_TOKEN': 'token'})
+def test_get_domain_and_token(mock_get_vcs):
+    assert(get_hvcs().domain())
+    assert(get_hvcs().token())
 
 
 class GithubCheckBuildStatusTests(TestCase):
@@ -80,21 +95,40 @@ class GithubCheckBuildStatusTests(TestCase):
                                                   '6dcb09b5b57875f334f61aebed695e2e4193db5e'))
 
 
+class GitlabCheckBuildStatusTests(TestCase):
+
+    @mock_gitlab('pending')
+    def test_should_return_false_if_pending(self, mock_config, mock_auth, mock_project):
+        self.assertFalse(check_build_status('owner', 'repo', 'my_ref'))
+
+    @mock_gitlab('failure')
+    def test_should_return_false_if_failure(self, mock_config, mock_auth, mock_project):
+        self.assertFalse(check_build_status('owner', 'repo', 'my_ref'))
+
+    @mock_gitlab('allow_failure')
+    def test_should_return_true_if_allow_failure(self, mock_config, mock_auth, mock_project):
+        self.assertTrue(check_build_status('owner', 'repo', 'my_ref'))
+
+    @mock_gitlab('success')
+    def test_should_return_true_if_success(self, mock_config, mock_auth, mock_project):
+        self.assertTrue(check_build_status('owner', 'repo', 'my_ref'))
+
+
 class GithubReleaseTests(TestCase):
     url = 'https://api.github.com/repos/relekang/rmoq/releases'
     edit_url = 'https://api.github.com/repos/relekang/rmoq/releases/1'
     get_url = 'https://api.github.com/repos/relekang/rmoq/releases/tags/v1.0.0'
 
     @responses.activate
-    @mock.patch('semantic_release.hvcs.Github.token', 'super-token')
-    def test_should_post_changelog(self):
+    @mock.patch('semantic_release.hvcs.Github.token', return_value='super-token')
+    def test_should_post_changelog(self, mock_token):
         def request_callback(request):
             payload = json.loads(request.body)
             self.assertEqual(payload['tag_name'], 'v1.0.0')
             self.assertEqual(payload['body'], 'text')
             self.assertEqual(payload['draft'], False)
             self.assertEqual(payload['prerelease'], False)
-            self.assertIn('?access_token=super-token', request.url)
+            self.assertEqual('token super-token', request.headers['Authorization'])
 
             return 201, {}, json.dumps({})
 
@@ -104,9 +138,8 @@ class GithubReleaseTests(TestCase):
             callback=request_callback,
             content_type='application/json'
         )
-        status, payload = Github.post_release_changelog('relekang', 'rmoq', '1.0.0', 'text')
+        status = Github.post_release_changelog('relekang', 'rmoq', '1.0.0', 'text')
         self.assertTrue(status)
-        self.assertEqual(payload, {})
 
     @responses.activate
     def test_should_return_false_status_if_it_failed(self):
@@ -131,9 +164,30 @@ class GithubReleaseTests(TestCase):
             body='{}',
             content_type='application/json'
         )
-        self.assertFalse(Github.post_release_changelog('relekang', 'rmoq', '1.0.0', 'text')[0])
+        self.assertFalse(Github.post_release_changelog('relekang', 'rmoq', '1.0.0', 'text'))
+
+
+class GitlabReleaseTests(TestCase):
+
+    @mock_gitlab()
+    def test_should_return_true_if_success(self, mock_config, mock_auth, mock_project):
+        self.assertTrue(post_changelog(
+            'owner', 'repo', 'my_good_tag', 'changelog'
+        ))
+
+    @mock_gitlab()
+    def test_should_return_false_if_bad_tag(self, mock_config, mock_auth, mock_project):
+        self.assertFalse(post_changelog(
+            'owner', 'repo', 'my_bad_tag', 'changelog'
+        ))
+
+    @mock_gitlab()
+    def test_should_return_false_if_failed_update(self, mock_config, mock_auth, mock_project):
+        self.assertFalse(post_changelog(
+            'owner', 'repo', 'my_locked_tag', 'changelog'
+        ))
 
 
 def test_github_token():
     with mock.patch('os.environ', {'GH_TOKEN': 'token'}):
-        assert(Github().token == 'token')
+        assert(Github.token() == 'token')
