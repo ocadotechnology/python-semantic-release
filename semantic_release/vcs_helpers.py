@@ -158,7 +158,7 @@ def push_new_version(
     auth_token: str = None,
     owner: str = None,
     name: str = None,
-    branch: str,
+    branch: str = 'master',
     domain: str = 'github.com',
 ):
     """
@@ -168,7 +168,6 @@ def push_new_version(
     :param owner: Organisation or user that owns the repository.
     :param name: Name of repository.
     :param branch: The branch the version should be pushed to.
-    :param server_url: Name of the server. Will be used to identify a gitlab instance.
     :raises GitError: if GitCommandError is raised
     """
 

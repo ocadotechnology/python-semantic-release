@@ -11,7 +11,7 @@ from semantic_release.errors import ImproperConfigurationError
 from .history import (evaluate_version_bump, get_current_version, get_new_version,
                       get_previous_version, set_new_version)
 from .history.logs import generate_changelog, markdown_changelog
-from .hvcs import check_build_status, check_token, get_domain, get_token, post_changelog
+from .hvcs import check_build_status, check_token, get_domain, post_changelog
 from .pypi import upload_to_pypi
 from .settings import config, overload_configuration
 from .vcs_helpers import (checkout, get_current_head_hash,
@@ -218,7 +218,7 @@ def publish(**kwargs):
 
     if version(**kwargs):
         push_new_version(
-            auth_token=get_token(),
+            auth_token=os.environ.get('GH_TOKEN'),
             owner=owner,
             name=name,
             branch=branch,
