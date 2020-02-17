@@ -1,6 +1,5 @@
 """Logs
 """
-import re
 from typing import Optional
 
 import ndebug
@@ -8,6 +7,7 @@ import ndebug
 from ..errors import UnknownCommitMessageStyleError
 from ..settings import config, current_commit_parser
 from ..vcs_helpers import get_commit_log
+from .parser_helpers import re_breaking
 
 debug = ndebug.create(__name__)
 
@@ -17,9 +17,13 @@ LEVELS = {
     3: 'major',
 }
 
-CHANGELOG_SECTIONS = ['feature', 'fix', 'breaking', 'documentation']
-
-re_breaking = re.compile('BREAKING CHANGE: (.*)')
+CHANGELOG_SECTIONS = [
+    'feature',
+    'fix',
+    'breaking',
+    'documentation',
+    'performance',
+]
 
 
 def evaluate_version_bump(current_version: str, force: str = None) -> Optional[str]:
@@ -41,8 +45,7 @@ def evaluate_version_bump(current_version: str, force: str = None) -> Optional[s
     commit_count = 0
 
     for _hash, commit_message in get_commit_log('v{0}'.format(current_version)):
-        if (commit_message.startswith(current_version) and
-                config.get('semantic_release', 'version_source') == 'commit'):
+        if commit_message.startswith(current_version):
             debug('"{}" is commit for {}. breaking loop'.format(commit_message, current_version))
             break
         try:
@@ -73,8 +76,14 @@ def generate_changelog(from_version: str, to_version: str = None) -> dict:
     :return: a dict with different changelog sections
     """
     debug('generate_changelog("{}", "{}")'.format(from_version, to_version))
-    changes: dict = {'feature': [], 'fix': [],
-                     'documentation': [], 'refactor': [], 'breaking': []}
+    changes: dict = {
+        'feature': [],
+        'fix': [],
+        'documentation': [],
+        'refactor': [],
+        'breaking': [],
+        'performance': [],
+    }
 
     found_the_release = to_version is None
 
@@ -99,15 +108,22 @@ def generate_changelog(from_version: str, to_version: str = None) -> dict:
 
             changes[message[1]].append((_hash, message[3][0]))
 
-            if message[3][1] and 'BREAKING CHANGE' in message[3][1]:
-                parts = re_breaking.match(message[3][1])
-                if parts:
-                    changes['breaking'].append((_hash, parts.group(1)))
+            # Handle breaking change message
+            parts = None
+            if message[0] == 3:
+                # parse footer (standard)
+                if message[3][2] and 'BREAKING CHANGE' in message[3][2]:
+                    parts = re_breaking.match(message[3][2])
+                # parse body (not standard, kept for backwards compatibility)
+                elif message[3][1] and 'BREAKING CHANGE' in message[3][1]:
+                    parts = re_breaking.match(message[3][1])
 
-            if message[3][2] and 'BREAKING CHANGE' in message[3][2]:
-                parts = re_breaking.match(message[3][2])
                 if parts:
-                    changes['breaking'].append((_hash, parts.group(1)))
+                    breaking_description = parts.group(1)
+                else:
+                    breaking_description = message[3][0]
+
+                changes['breaking'].append((_hash, breaking_description))
 
         except UnknownCommitMessageStyleError as err:
             debug('Ignoring', err)

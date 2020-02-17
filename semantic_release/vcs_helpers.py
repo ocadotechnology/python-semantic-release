@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 
 import ndebug
 from git import GitCommandError, InvalidGitRepositoryError, Repo, TagObject
+from git.exc import BadName
 
 from .errors import GitError, HvcsRepoParseError
 from .settings import config
@@ -32,7 +33,11 @@ def get_commit_log(from_rev=None):
     check_repo()
     rev = None
     if from_rev:
-        rev = '...{from_rev}'.format(from_rev=from_rev)
+        try:
+            repo.commit(from_rev)
+            rev = '...{from_rev}'.format(from_rev=from_rev)
+        except BadName:
+            debug('Reference {} does not exist, considering all log'.format(from_rev))
     for commit in repo.iter_commits(rev):
         yield (commit.hexsha, commit.message)
 
@@ -85,7 +90,7 @@ def get_repository_owner_and_name() -> Tuple[str, str]:
 
     check_repo()
     url = repo.remote('origin').url
-    parts = re.search(r'([^/:]+)/([^/]+).git$', url)
+    parts = re.search(r'[:/]([^\.:]+)/([^/]*?)(.git)?$', url)
     if not parts:
         raise HvcsRepoParseError
     debug('get_repository_owner_and_name', parts)
@@ -135,36 +140,53 @@ def tag_new_version(version: str):
 
 
 def push_new_version(
-    gh_token: str = None,
+    auth_token: str = None,
     owner: str = None,
     name: str = None,
-    branch: str = "master"
+    branch: str = 'master',
+    domain: str = 'github.com',
 ):
     """
     Runs git push and git push --tags.
 
-    :param gh_token: Github token used to push.
+    :param auth_token: Authentication token used to push.
     :param owner: Organisation or user that owns the repository.
     :param name: Name of repository.
     :param branch: Branch to push to
+    :param server_url: Name of the server. Will be used to identify a gitlab instance.
     :raises GitError: if GitCommandError is raised
     """
 
     check_repo()
     server = 'origin'
-    if gh_token:
-        server = 'https://{token}@{repo}'.format(
-            token=gh_token,
-            repo='github.com/{owner}/{name}.git'.format(owner=owner, name=name)
-        )
+    if auth_token:
+        token = auth_token
+        if config.get('semantic_release', 'hvcs') == 'gitlab':
+            token = 'gitlab-ci-token:' + token
+        actor = os.environ.get('GITHUB_ACTOR')
+        if actor:
+            server = 'https://{actor}:{token}@{server_url}/{owner}/{name}.git'.format(
+                token=token,
+                server_url=domain,
+                owner=owner,
+                name=name,
+                actor=actor
+            )
+        else:
+            server = 'https://{token}@{server_url}/{owner}/{name}.git'.format(
+                token=token,
+                server_url=domain,
+                owner=owner,
+                name=name,
+            )
 
     try:
         repo.git.push(server, branch)
         repo.git.push('--tags', server, branch)
     except GitCommandError as error:
         message = str(error)
-        if gh_token:
-            message = message.replace(gh_token, '[GH_TOKEN]')
+        if auth_token:
+            message = message.replace(auth_token, '[AUTH_TOKEN]')
         raise GitError(message)
 
 

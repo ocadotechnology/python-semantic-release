@@ -16,18 +16,28 @@ def test_parser_raises_unknown_message_style():
 
 def test_parser_return_correct_bump_level():
     assert(
-        angular_parser('feat(parsers): Add new parser pattern\n\nBREAKING CHANGE:')[0] ==
+        angular_parser('feat(parsers): Add new parser pattern\n\nBREAKING CHANGE: ')[0] ==
+        3
+    )
+    assert(
+        angular_parser('feat(parsers)!: Add new parser pattern\n\nBREAKING CHANGE: ')[0] ==
         3
     )
     assert(
         angular_parser('feat(parsers): Add new parser pattern\n\n'
-                       'New pattern is awesome\n\nBREAKING CHANGE:')[0] ==
+                       'New pattern is awesome\n\nBREAKING CHANGE: ')[0] ==
+        3
+    )
+    assert(
+        angular_parser('feat(parsers): Add new parser pattern\n\nBREAKING-CHANGE: change !')[0] ==
         3
     )
     assert angular_parser('feat(parser): Add emoji parser')[0] == 2
     assert angular_parser('fix(parser): Fix regex in angular parser')[0] == 1
     assert angular_parser(
         'test(parser): Add a test for angular parser')[0] == 0
+    assert angular_parser('feat(parser)!: Edit dat parsing stuff')[0] == 3
+    assert angular_parser('fix!: Edit dat parsing stuff again')[0] == 3
 
 
 def test_parser_return_type_from_commit_message():
