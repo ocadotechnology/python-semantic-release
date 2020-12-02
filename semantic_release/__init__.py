@@ -1,10 +1,10 @@
 """Semantic Release
 """
-__version__ = '4.5.1'
+__version__ = "7.4.0"
 
 
-from .errors import UnknownCommitMessageStyleError  # noqa
-from .errors import ImproperConfigurationError, SemanticReleaseBaseError  # noqa
+from .errors import UnknownCommitMessageStyleError  # noqa; noqa
+from .errors import ImproperConfigurationError, SemanticReleaseBaseError
 
 
 def setup_hook(argv: list):
@@ -13,6 +13,7 @@ def setup_hook(argv: list):
 
     :param argv: sys.argv
     """
-    if len(argv) > 1 and argv[1] in ['version', 'publish', 'changelog']:
+    if len(argv) > 1 and argv[1] in ["version", "publish", "changelog"]:
         from .cli import main
+
         main()

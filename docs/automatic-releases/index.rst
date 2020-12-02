@@ -64,11 +64,10 @@ upload to pypi and push to git and it should be ready to roll.
 
 Configuring pypi upload
 ^^^^^^^^^^^^^^^^^^^^^^^
-In order to upload to pypi python-semantic-release needs credentials to an account that
-have access to the given package. Either by being logged in through a pip configuration file
-or through environment variables. The latter is most often preferable in an CI environment.
-You will need to set ``PYPI_USERNAME`` and ``PYPI_PASSWORD``. Make sure that you mark it
-as a secret on your CI service so that your password will be left out of the build logs.
+In order to upload to PYPI, Python Semantic Release needs credentials to access
+the project. You will need to set the environment variable :ref:`env-pypi_token`.
+Make sure that you mark it as a secret on your CI service so that it is left out
+of the build logs.
 
 
 .. _automatic-github:
@@ -76,13 +75,14 @@ as a secret on your CI service so that your password will be left out of the bui
 Configuring push to Github
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 In order to push to Github and post the changelog to Github the environment variable
-``GH_TOKEN`` has to be set. It needs access to the ``public_repo`` scope for public repositories
-and ``repo`` for private repositories.
+:ref:`env-gh_token` has to be set. It needs access to the ``public_repo`` scope for
+public repositories and ``repo`` for private repositories.
 
 
-Step-by-Step guides
-^^^^^^^^^^^^^^^^^^^
+Guides
+^^^^^^
 * :doc:`travis`
+* :doc:`github-actions`
 
 
 Publish with cronjobs

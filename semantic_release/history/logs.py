@@ -1,41 +1,33 @@
 """Logs
 """
+import logging
 from typing import Optional
 
-import ndebug
-
 from ..errors import UnknownCommitMessageStyleError
+from ..helpers import LoggedFunction
 from ..settings import config, current_commit_parser
 from ..vcs_helpers import get_commit_log
 from .parser_helpers import re_breaking
 
-debug = ndebug.create(__name__)
+logger = logging.getLogger(__name__)
 
 LEVELS = {
-    1: 'patch',
-    2: 'minor',
-    3: 'major',
+    1: "patch",
+    2: "minor",
+    3: "major",
 }
 
-CHANGELOG_SECTIONS = [
-    'feature',
-    'fix',
-    'breaking',
-    'documentation',
-    'performance',
-]
 
-
+@LoggedFunction(logger)
 def evaluate_version_bump(current_version: str, force: str = None) -> Optional[str]:
     """
-    Reads git log since last release to find out if should be a major, minor or patch release.
+    Read git log since the last release to decide if we should make a major, minor or patch release.
 
     :param current_version: A string with the current version number.
     :param force: A string with the bump level that should be forced.
-    :return: A string with either major, minor or patch if there should be a release. If no release
-             is necessary None will be returned.
+    :return: A string with either major, minor or patch if there should be a release.
+             If no release is necessary, None will be returned.
     """
-    debug('evaluate_version_bump("{}", "{}")'.format(current_version, force))
     if force:
         return force
 
@@ -44,115 +36,104 @@ def evaluate_version_bump(current_version: str, force: str = None) -> Optional[s
     changes = []
     commit_count = 0
 
-    for _hash, commit_message in get_commit_log('v{0}'.format(current_version)):
+    for _hash, commit_message in get_commit_log("v{0}".format(current_version)):
         if commit_message.startswith(current_version):
-            debug('"{}" is commit for {}. breaking loop'.format(commit_message, current_version))
+            # Stop once we reach the current version
+            # (we are looping in the order of newest -> oldest)
+            logger.debug(
+                '"{}" is commit for {}, breaking loop'.format(
+                    commit_message, current_version
+                )
+            )
             break
-        try:
-            message = current_commit_parser()(commit_message)
-            changes.append(message[0])
-        except UnknownCommitMessageStyleError as err:
-            debug('ignored', err)
-            pass
 
         commit_count += 1
 
+        # Attempt to parse this commit using the currently-configured parser
+        try:
+            message = current_commit_parser()(commit_message)
+            changes.append(message.bump)
+        except UnknownCommitMessageStyleError as err:
+            logger.debug(f"Ignoring UnknownCommitMessageStyleError: {err}")
+            pass
+
+    logger.debug(f"Commits found since last release: {commit_count}")
+
     if changes:
+        # Select the largest required bump level from the commits we parsed
         level = max(changes)
         if level in LEVELS:
             bump = LEVELS[level]
-    if config.getboolean('semantic_release', 'patch_without_tag') and commit_count:
-        bump = 'patch'
+        else:
+            logger.warning(f"Unknown bump level {level}")
+
+    if config.get("patch_without_tag") and commit_count > 0 and bump is None:
+        bump = "patch"
+        logger.debug(f"Changing bump level to patch based on config patch_without_tag")
+
     return bump
 
 
+@LoggedFunction(logger)
 def generate_changelog(from_version: str, to_version: str = None) -> dict:
     """
-    Generates a changelog for the given version.
+    Parse a changelog dictionary for the given version.
 
-    :param from_version: The last version not in the changelog. The changelog
-                         will be generated from the commit after this one.
-    :param to_version: The last version in the changelog.
-    :return: a dict with different changelog sections
+    :param from_version: The version before where the changelog starts.
+                         The changelog will be generated from the commit after this one.
+    :param to_version: The last version included in the changelog.
+    :return: A dict with changelog sections and commits
     """
-    debug('generate_changelog("{}", "{}")'.format(from_version, to_version))
-    changes: dict = {
-        'feature': [],
-        'fix': [],
-        'documentation': [],
-        'refactor': [],
-        'breaking': [],
-        'performance': [],
-    }
-
-    found_the_release = to_version is None
+    # Additional sections will be added as new types are encountered
+    changes: dict = {"breaking": []}
 
     rev = None
     if from_version:
-        rev = 'v{0}'.format(from_version)
+        rev = "v{0}".format(from_version)
 
+    found_the_release = to_version is None
     for _hash, commit_message in get_commit_log(rev):
         if not found_the_release:
+            # Skip until we find the last commit in this release
+            # (we are looping in the order of newest -> oldest)
             if to_version and to_version not in commit_message:
                 continue
             else:
+                logger.debug(
+                    f"Reached the start of {to_version}, beginning changelog generation"
+                )
                 found_the_release = True
 
         if from_version is not None and from_version in commit_message:
+            # We reached the previous release
+            logger.debug(f"{from_version} reached, ending changelog generation")
             break
 
         try:
             message = current_commit_parser()(commit_message)
-            if message[1] not in changes:
-                continue
+            if message.type not in changes:
+                logger.debug(f"Creating new changelog section for {message.type} ")
+                changes[message.type] = list()
 
-            changes[message[1]].append((_hash, message[3][0]))
+            # Capitalize the first letter of the message, leaving others as they were
+            # (using str.capitalize() would make the other letters lowercase)
+            formatted_message = (
+                message.descriptions[0][0].upper() + message.descriptions[0][1:]
+            )
+            if config.get("changelog_capitalize") is False:
+                formatted_message = message.descriptions[0]
 
-            # Handle breaking change message
-            parts = None
-            if message[0] == 3:
-                # parse footer (standard)
-                if message[3][2] and 'BREAKING CHANGE' in message[3][2]:
-                    parts = re_breaking.match(message[3][2])
-                # parse body (not standard, kept for backwards compatibility)
-                elif message[3][1] and 'BREAKING CHANGE' in message[3][1]:
-                    parts = re_breaking.match(message[3][1])
+            changes[message.type].append((_hash, formatted_message))
 
-                if parts:
-                    breaking_description = parts.group(1)
-                else:
-                    breaking_description = message[3][0]
-
-                changes['breaking'].append((_hash, breaking_description))
+            if message.breaking_descriptions:
+                # Copy breaking change descriptions into changelog
+                for paragraph in message.breaking_descriptions:
+                    changes["breaking"].append((_hash, paragraph))
+            elif message.bump == 3:
+                # Major, but no breaking descriptions, use commit subject instead
+                changes["breaking"].append((_hash, message.descriptions[0]))
 
         except UnknownCommitMessageStyleError as err:
-            debug('Ignoring', err)
-            pass
+            logger.debug(f"Ignoring UnknownCommitMessageStyleError: {err}")
 
     return changes
-
-
-def markdown_changelog(version: str, changelog: dict, header: bool = False) -> str:
-    """
-    Generates a markdown version of the changelog. Takes a parsed changelog dict from
-    generate_changelog.
-
-    :param version: A string with the version number.
-    :param changelog: A dict from generate_changelog.
-    :param header: A boolean that decides whether a header should be included or not.
-    :return: The markdown formatted changelog.
-    """
-    debug('markdown_changelog(version="{}", header={}, changelog=...)'.format(version, header))
-    output = ''
-    if header:
-        output += '## v{0}\n'.format(version)
-
-    for section in CHANGELOG_SECTIONS:
-        if not changelog[section]:
-            continue
-
-        output += '\n### {0}\n'.format(section.capitalize())
-        for item in changelog[section]:
-            output += '* {0} ({1})\n'.format(item[1], item[0])
-
-    return output

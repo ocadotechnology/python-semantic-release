@@ -7,40 +7,55 @@ from . import mock
 
 
 class PypiTests(TestCase):
-    @mock.patch('semantic_release.pypi.run')
-    def test_upload_without_arguments(self, mock_run):
-        upload_to_pypi(username='username', password='password')
+    @mock.patch("semantic_release.pypi.run")
+    @mock.patch.dict(
+        "os.environ", {"PYPI_USERNAME": "username", "PYPI_PASSWORD": "password"}
+    )
+    def test_upload_with_password(self, mock_run):
+        upload_to_pypi()
         self.assertEqual(
             mock_run.call_args_list,
-            [
-                mock.call('rm -rf dist'),
-                mock.call('python setup.py sdist bdist_wheel'),
-                mock.call("twine upload -u 'username' -p 'password'  \"dist/*\""),
-                mock.call('rm -rf dist')
-            ]
+            [mock.call("twine upload -u 'username' -p 'password'  \"dist/*\"")],
         )
 
-    @mock.patch('semantic_release.pypi.run')
-    def test_upload_without_removing_dist(self, mock_run):
-        upload_to_pypi(username='username', password='password', remove_dist=False)
+    @mock.patch("semantic_release.pypi.run")
+    @mock.patch.dict("os.environ", {"PYPI_TOKEN": "pypi-x"})
+    def test_upload_with_token(self, mock_run):
+        upload_to_pypi()
         self.assertEqual(
             mock_run.call_args_list,
-            [
-                mock.call('python setup.py sdist bdist_wheel'),
-                mock.call("twine upload -u 'username' -p 'password'  \"dist/*\""),
-            ]
+            [mock.call("twine upload -u '__token__' -p 'pypi-x'  \"dist/*\"")],
         )
 
-    @mock.patch('semantic_release.pypi.run')
+    @mock.patch("semantic_release.pypi.run")
+    @mock.patch.dict(
+        "os.environ",
+        {
+            "PYPI_TOKEN": "pypi-x",
+            "PYPI_USERNAME": "username",
+            "PYPI_PASSWORD": "password",
+        },
+    )
+    def test_upload_prefers_token_over_password(self, mock_run):
+        upload_to_pypi()
+        self.assertEqual(
+            mock_run.call_args_list,
+            [mock.call("twine upload -u '__token__' -p 'pypi-x'  \"dist/*\"")],
+        )
+
+    @mock.patch("semantic_release.pypi.run")
+    @mock.patch.dict("os.environ", {"PYPI_TOKEN": "pypi-x"})
     def test_upload_with_custom_path(self, mock_run):
-        upload_to_pypi(path='custom-dist', username='username', password='password')
-        args = mock_run.call_args_list
-        self.assertEqual(args[0], mock.call('rm -rf custom-dist'),)
-        self.assertEqual(args[1], mock.call('python setup.py sdist bdist_wheel'),)
-        self.assertEqual(args[2], mock.call(
-            "twine upload -u 'username' -p 'password'  \"custom-dist/*\""),
+        upload_to_pypi(path="custom-dist")
+        self.assertEqual(
+            mock_run.call_args_list,
+            [mock.call("twine upload -u '__token__' -p 'pypi-x'  \"custom-dist/*\"")],
         )
-        self.assertEqual(args[3], mock.call('rm -rf custom-dist'))
+
+    @mock.patch.dict("os.environ", {"PYPI_TOKEN": "invalid"})
+    def test_raises_error_when_token_invalid(self):
+        with self.assertRaises(ImproperConfigurationError):
+            upload_to_pypi()
 
     def test_raises_error_when_missing_credentials(self):
         with self.assertRaises(ImproperConfigurationError):

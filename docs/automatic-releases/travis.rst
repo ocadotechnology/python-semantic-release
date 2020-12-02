@@ -8,7 +8,7 @@ If this is not the case, please refer to `Travis documentation`_ on how to do th
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 See :doc:`../configuration` for details on how to configure python-semantic-release.
-Make sure that at least you have set ``version_variable`` before continuing.
+Make sure that at least you have set :ref:`config-version_variable` before continuing.
 
 2. Add environment variables
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -16,10 +16,10 @@ You will need to set up three environment variables in Travis. An easy way to do
 is to go to the settings page for your package and add them there. Make sure that the
 secret toggle is set correct for the ones that are secret.
 
-You will need to set ``PYPI_USERNAME`` and ``PYPI_PASSWORD`` with values corresponding
-to a pypi user with access to the given package. Furthermore, you need to set ``GH_TOKEN``
-with a personal access token for Github. It will need either ``repo`` or ``public_repo`` scope
-depending on whether the repository is private or public.
+You will need to set :ref:`env-pypi_token` to a PyPI API token. Furthermore,
+you need to set :ref:`env-gh_token` with a personal access token for Github. It will
+need either ``repo`` or ``public_repo`` scope depending on whether the
+repository is private or public.
 
 More information on how to set environment variables can be found on
 `Travis documentation on environment variables`_.

@@ -1,83 +1,92 @@
-"""Angular commit style commit parser
 """
-import re
-from typing import Tuple
+Angular commit style parser
 
-import ndebug
+https://github.com/angular/angular/blob/master/CONTRIBUTING.md#-commit-message-guidelines
+"""
+import logging
+import re
 
 from ..errors import UnknownCommitMessageStyleError
-from .parser_helpers import parse_text_block, re_breaking
+from ..helpers import LoggedFunction
+from .parser_helpers import ParsedCommit, parse_paragraphs, re_breaking
 
-debug = ndebug.create(__name__)
+logger = logging.getLogger(__name__)
 
+# Supported commit types for parsing
 TYPES = {
-    'feat': 'feature',
-    'fix': 'fix',
-    'test': 'test',
-    'docs': 'documentation',
-    'style': 'style',
-    'refactor': 'refactor',
-    'build': 'build',
-    'ci': 'ci',
-    'perf': 'performance',
-    'chore': 'chore',
+    "feat": "feature",
+    "fix": "fix",
+    "test": "test",
+    "docs": "documentation",
+    "style": "style",
+    "refactor": "refactor",
+    "build": "build",
+    "ci": "ci",
+    "perf": "performance",
+    "chore": "chore",
 }
 
 re_parser = re.compile(
-    r'(?P<type>' + '|'.join(TYPES.keys()) + ')'
-    r'(?:\((?P<scope>[^\n]+)\))?'
-    r'(?P<break>!)?: '
-    r'(?P<subject>[^\n]+)'
-    r'(:?\n\n(?P<text>.+))?',
-    re.DOTALL
+    r"(?P<type>" + "|".join(TYPES.keys()) + ")"
+    r"(?:\((?P<scope>[^\n]+)\))?"
+    r"(?P<break>!)?: "
+    r"(?P<subject>[^\n]+)"
+    r"(:?\n\n(?P<text>.+))?",
+    re.DOTALL,
 )
 
 MINOR_TYPES = [
-    'feat',
+    "feat",
 ]
 
 PATCH_TYPES = [
-    'fix',
-    'perf',
+    "fix",
+    "perf",
 ]
 
 
-def parse_commit_message(message: str) -> Tuple[int, str, str, Tuple[str, str, str]]:
+@LoggedFunction(logger)
+def parse_commit_message(message: str) -> ParsedCommit:
     """
-    Parses a commit message according to the angular commit guidelines specification.
+    Parse a commit message according to the angular commit guidelines specification.
 
     :param message: A string of a commit message.
     :return: A tuple of (level to bump, type of change, scope of change, a tuple with descriptions)
     :raises UnknownCommitMessageStyleError: if regular expression matching fails
     """
+    # Attempt to parse the commit message with a regular expression
     parsed = re_parser.match(message)
     if not parsed:
         raise UnknownCommitMessageStyleError(
-            'Unable to parse the given commit message: {}'.format(message)
+            "Unable to parse the given commit message: {}".format(message)
         )
 
-    body, footer = parse_text_block(parsed.group('text'))
+    if parsed.group("text"):
+        descriptions = parse_paragraphs(parsed.group("text"))
+    else:
+        descriptions = list()
+    # Insert the subject before the other paragraphs
+    descriptions.insert(0, parsed.group("subject"))
+
+    # Look for descriptions of breaking changes
+    breaking_descriptions = [
+        match.group(1)
+        for match in (re_breaking.match(p) for p in descriptions[1:])
+        if match
+    ]
 
     level_bump = 0
-    if parsed.group('break') or re_breaking.match(body) or re_breaking.match(footer):
-        level_bump = 3
+    if parsed.group("break") or breaking_descriptions:
+        level_bump = 3  # Major
+    elif parsed.group("type") in MINOR_TYPES:
+        level_bump = 2  # Minor
+    elif parsed.group("type") in PATCH_TYPES:
+        level_bump = 1  # Patch
 
-    if parsed.group('type') in MINOR_TYPES:
-        level_bump = max([level_bump, 2])
-
-    if parsed.group('type') in PATCH_TYPES:
-        level_bump = max([level_bump, 1])
-
-    if debug.enabled:
-        debug('parse_commit_message -> ({}, {}, {}, {})'.format(
-            level_bump,
-            TYPES[parsed.group('type')],
-            parsed.group('scope'),
-            (parsed.group('subject'), body, footer)
-        ))
-    return (
+    return ParsedCommit(
         level_bump,
-        TYPES[parsed.group('type')],
-        parsed.group('scope'),
-        (parsed.group('subject'), body, footer)
+        TYPES[parsed.group("type")],
+        parsed.group("scope"),
+        descriptions,
+        breaking_descriptions,
     )

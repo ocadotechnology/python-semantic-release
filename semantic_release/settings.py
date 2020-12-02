@@ -1,70 +1,131 @@
-"""Settings
+"""Helpers to read settings from setup.cfg or pyproject.toml
 """
 import configparser
 import importlib
+import logging
 import os
+from collections import UserDict
 from functools import wraps
 from os import getcwd
-from typing import Callable
+from typing import Callable, List
 
-import ndebug
 import toml
 
 from .errors import ImproperConfigurationError
 
-debug = ndebug.create(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _config():
-    parser = configparser.ConfigParser()
-    current_dir = getcwd()
-    parser.read([
-        os.path.join(os.path.dirname(__file__), 'defaults.cfg'),
-        os.path.join(current_dir, 'setup.cfg')
-    ])
-    toml_conf_path = os.path.join(current_dir, 'pyproject.toml')
-    if os.path.isfile(toml_conf_path):
-        with open(toml_conf_path, 'r') as pyproject_toml:
-            try:
-                pyproject_toml = toml.load(pyproject_toml)
-                for key, value in (pyproject_toml.get('tool', {})
-                                                 .get('semantic_release', {})
-                                                 .items()):
-                    parser['semantic_release'][key] = str(value)
-            except toml.TomlDecodeError:
-                debug("Could not decode pyproject.toml")
+    cwd = getcwd()
+    ini_paths = [
+        os.path.join(os.path.dirname(__file__), "defaults.cfg"),
+        os.path.join(cwd, "setup.cfg"),
+    ]
+    ini_config = _config_from_ini(ini_paths)
 
-    return parser
+    toml_path = os.path.join(cwd, "pyproject.toml")
+    toml_config = _config_from_pyproject(toml_path)
+
+    # Cast to a UserDict so that we can mock the get() method.
+    return UserDict({**ini_config, **toml_config})
+
+
+def _config_from_ini(paths):
+    parser = configparser.ConfigParser()
+    parser.read(paths)
+
+    flags = {
+        "check_build_status",
+        "commit_version_number",
+        "remove_dist",
+        "upload_to_pypi",
+        "upload_to_release",
+        "patch_without_tag",
+    }
+
+    # Iterate through the sections so that default values are applied
+    # correctly.  See:
+    # https://stackoverflow.com/questions/1773793/convert-configparser-items-to-dictionary
+    config = {}
+    for key, _ in parser.items("semantic_release"):
+        if key in flags:
+            config[key] = parser.getboolean("semantic_release", key)
+        else:
+            config[key] = parser.get("semantic_release", key)
+
+    return config
+
+
+def _config_from_pyproject(path):
+    if not os.path.isfile(path):
+        return {}
+
+    try:
+        pyproject = toml.load(path)
+        return pyproject.get("tool", {}).get("semantic_release", {})
+
+    except toml.TomlDecodeError:
+        logger.debug("Could not decode pyproject.toml")
+        return {}
 
 
 config = _config()
 
 
 def current_commit_parser() -> Callable:
-    """Current commit parser
+    """Get the currently-configured commit parser
 
     :raises ImproperConfigurationError: if ImportError or AttributeError is raised
+    :returns: Commit parser
     """
 
     try:
-        parts = config.get('semantic_release', 'commit_parser').split('.')
-        module = '.'.join(parts[:-1])
+        # All except the last part is the import path
+        parts = config.get("commit_parser").split(".")
+        module = ".".join(parts[:-1])
+        # The final part is the name of the parse function
         return getattr(importlib.import_module(module), parts[-1])
     except (ImportError, AttributeError) as error:
         raise ImproperConfigurationError('Unable to import parser "{}"'.format(error))
+
+
+def current_changelog_components() -> List[Callable]:
+    """Get the currently-configured changelog components
+
+    :raises ImproperConfigurationError: if ImportError or AttributeError is raised
+    :returns: List of component functions
+    """
+    component_paths = config.get("changelog_components").split(",")
+    components = list()
+
+    for path in component_paths:
+        try:
+            # All except the last part is the import path
+            parts = path.split(".")
+            module = ".".join(parts[:-1])
+            # The final part is the name of the component function
+            components.append(getattr(importlib.import_module(module), parts[-1]))
+        except (ImportError, AttributeError) as error:
+            raise ImproperConfigurationError(
+                f'Unable to import changelog component "{path}"'
+            )
+
+    return components
 
 
 def overload_configuration(func):
     """This decorator gets the content of the "define" array and edits "config"
     according to the pairs of key/value.
     """
+
     @wraps(func)
     def wrap(*args, **kwargs):
-        if 'define' in kwargs:
-            for defined_param in kwargs['define']:
-                pair = defined_param.split('=', maxsplit=1)
+        if "define" in kwargs:
+            for defined_param in kwargs["define"]:
+                pair = defined_param.split("=", maxsplit=1)
                 if len(pair) == 2:
-                    config['semantic_release'][str(pair[0])] = str(pair[1])
+                    config[str(pair[0])] = pair[1]
         return func(*args, **kwargs)
 
     return wrap

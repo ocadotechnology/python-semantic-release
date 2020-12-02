@@ -3,13 +3,9 @@ Contributing
 
 If you want to contribute that is awesome. Remember to be nice to others in issues and reviews.
 
-**It is nice if you follow this list:**
+Please remember to write tests for the cool things you create or fix.
 
-* Follow pep8 (run flake8).
-* Follow the import sorting guidelines (run isort).
-* Write tests for the cool things you create or fix.
-
-Unsure about something from that list or anything else? No worries, `open an issue`_.
+Unsure about something? No worries, `open an issue`_.
 
 .. _open an issue: https://github.com/relekang/python-semantic-release/issues/new
 
@@ -33,12 +29,13 @@ that should result in a new release it will happen if the build is green.
 Development
 ~~~~~~~~~~~
 
-Install this module and the development dependencies:
+Install this module and the development dependencies::
 
-::
+    pip install -e ".[test,dev]"
 
-    python setup.py develop
-    pip install -r requirements/dev.txt
+And if you'd like to build the documentation locally::
+
+    pip install -e ".[docs]"
 
 Testing
 ~~~~~~~

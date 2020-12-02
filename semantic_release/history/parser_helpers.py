@@ -1,24 +1,27 @@
 """Commit parser helpers
 """
+import collections
 import re
-from typing import Tuple
+from typing import List
 
-re_breaking = re.compile('BREAKING[ -]CHANGE: (.*)')
+re_breaking = re.compile("BREAKING[ -]CHANGE: ?(.*)")
 
 
-def parse_text_block(text: str) -> Tuple[str, str]:
+ParsedCommit = collections.namedtuple(
+    "ParsedCommit", ["bump", "type", "scope", "descriptions", "breaking_descriptions"]
+)
+
+
+def parse_paragraphs(text: str) -> List[str]:
     """
-    This will take a text block and return a tuple with body and footer,
-    where footer is defined as the last paragraph.
+    This will take a text block and return a tuple containing each
+    paragraph with single line breaks collapsed into spaces.
 
     :param text: The text string to be divided.
-    :return: A tuple with body and footer,
-    where footer is defined as the last paragraph.
+    :return: A tuple of paragraphs.
     """
-    body, footer = '', ''
-    if text:
-        body = text.split('\n\n')[0]
-        if len(text.split('\n\n')) == 2:
-            footer = text.split('\n\n')[1]
-
-    return body.replace('\n', ' '), footer.replace('\n', ' ')
+    return [
+        paragraph.replace("\n", " ")
+        for paragraph in text.split("\n\n")
+        if len(paragraph) > 0
+    ]
