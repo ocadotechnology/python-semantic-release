@@ -31,7 +31,7 @@ class VersionPattern:
     function to create the version patterns specified in the config files.
     """
 
-    version_regex = r"(\d+\.\d+(?:\.\d+)?)"
+    version_regex = r"(\d+\.\d+(?:\.\d+)?(?:(?:b|dev)\d+)?)"
 
     # The pattern should be a regular expression with a single group,
     # containing the version to replace.
@@ -201,9 +201,9 @@ def get_previous_version(version: str) -> Optional[str]:
     """
     logger.debug('get_previous_version')
     if ".dev" in version:
-        pattern = r'v?(\d+\.\d+\.\d+\.dev\d+)'
+        pattern = r'v?(\d+\.\d+\.\d+dev\d+)'
     elif "b" in version:
-        pattern = r'v?(\d+\.\d+\.\d+\.b\d+)'
+        pattern = r'v?(\d+\.\d+\.\d+b\d+)'
     else:
         pattern = r'v?(\d+.\d+.\d+)'
     found_version = False

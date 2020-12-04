@@ -61,12 +61,12 @@ def get_last_master_version(skip_tags=None):
 
 
 def get_last_beta_version(skip_tags=None):
-    pattern = r"v\d+\.\d+\.\d+\.b\d+"
+    pattern = r"v\d+\.\d+\.\d+b\d+"
     return get_last_version(pattern, skip_tags)
 
 
 def get_last_dev_version(skip_tags=None):
-    pattern = r"v\d+\.\d+\.\d+\.dev\d+"
+    pattern = r"v\d+\.\d+\.\d+dev\d+"
     return get_last_version(pattern, skip_tags)
 
 @check_repo
