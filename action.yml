@@ -19,6 +19,15 @@ inputs:
   pypi_password:
     description: 'Password to the account specified in pypi_username'
     required: false
+  branch:
+    description: 'Branch the build is on.'
+    required: false
+  build:
+    description: 'Build number for beta releases.'
+    required: false
+  dev:
+    description: 'Whether or not the build is happening on the dev server.'
+    required: false
 
 runs:
   using: 'docker'
