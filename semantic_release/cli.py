@@ -67,9 +67,11 @@ COMMON_OPTIONS = [
         is_flag=True,
         help="No-operations mode, finds the new version number without changing it.",
     ),
-    click.option('--branch', help='Branch the build is on.'),
-    click.option('--build', help='Build number for beta releases.'),
-    click.option('--dev', help='Whether or not the build is happening on the dev server.'),
+    click.option("--branch", help="Branch the build is on."),
+    click.option("--build", help="Build number for beta releases."),
+    click.option(
+        "--dev", help="Whether or not the build is happening on the dev server."
+    ),
     click.option(
         "--define",
         "-D",
@@ -123,9 +125,19 @@ def version(*, retry=False, noop=False, force_level=None, **kwargs):
         return deploy_dev_release(master_version, build)
     else:
         if branch == "development":
-            return deploy_release(master_version, current_version, retry, noop, force_level, beta=True, build=build)
+            return deploy_release(
+                master_version,
+                current_version,
+                retry,
+                noop,
+                force_level,
+                beta=True,
+                build=build,
+            )
         elif branch == "master":
-            return deploy_release(master_version, current_version, retry, noop, force_level)
+            return deploy_release(
+                master_version, current_version, retry, noop, force_level
+            )
 
     return True
 
@@ -136,12 +148,14 @@ def deploy_dev_release(master_version, build):
     tag_new_version(new_version)
     set_new_version(new_version)
 
-    logger.info('Not bumping as this is a dev build.')
+    logger.info("Not bumping as this is a dev build.")
 
     return True
 
 
-def deploy_release(master_version, current_version, retry, noop, force_level, beta=False, build=''):
+def deploy_release(
+    master_version, current_version, retry, noop, force_level, beta=False, build=""
+):
     level_bump = evaluate_version_bump(current_version, force_level)
     bumped_version = get_new_version(master_version, level_bump)
 
@@ -151,7 +165,10 @@ def deploy_release(master_version, current_version, retry, noop, force_level, be
         new_version = bumped_version
 
     if not should_bump_version(
-        current_version=master_version, new_version=bumped_version, retry=retry, noop=noop
+        current_version=master_version,
+        new_version=bumped_version,
+        retry=retry,
+        noop=noop,
     ):
         return False
 
@@ -168,7 +185,7 @@ def deploy_release(master_version, current_version, retry, noop, force_level, be
 def should_bump_version(*, current_version, new_version, retry=False, noop=False):
     """Test whether the version should be bumped."""
     if new_version == current_version and not retry:
-        logger.info("No release will be made.")        
+        logger.info("No release will be made.")
         return False
 
     if noop:
@@ -294,7 +311,7 @@ def publish(**kwargs):
         # A new version was released
         logger.info("Pushing new version")
         push_new_version(
-            auth_token=os.environ.get('GH_TOKEN'),
+            auth_token=os.environ.get("GH_TOKEN"),
             owner=owner,
             name=name,
             branch=branch,
