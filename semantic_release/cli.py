@@ -143,7 +143,7 @@ def version(*, retry=False, noop=False, force_level=None, **kwargs):
 
 
 def deploy_dev_release(master_version, build):
-    new_version = master_version + ".dev" + build
+    new_version = master_version + "dev" + build
 
     tag_new_version(new_version)
     set_new_version(new_version)
@@ -266,6 +266,16 @@ def changelog(*, unreleased=False, noop=False, post=False, **kwargs):
 def publish(**kwargs):
     """Run the version task, then push to git and upload to PyPI / GitHub Releases."""
     current_version = get_current_version()
+    dev = "dev" in current_version
+    beta = "b" in current_version
+    build = kwargs.get("build")
+
+    if dev:
+        master_version = current_version.split("dev")[0][:-1]
+    elif beta:
+        master_version = current_version.split("b")[0]
+    else:
+        master_version = current_version
 
     retry = kwargs.get("retry")
     if retry:
@@ -273,12 +283,19 @@ def publish(**kwargs):
         # The "new" version will actually be the current version, and the
         # "current" version will be the previous version.
         level_bump = None
-        new_version = current_version
-        current_version = get_previous_version(current_version)
+        new_version = master_version
+        master_version = get_previous_version(master_version)
     else:
-        # Calculate the new version
-        level_bump = evaluate_version_bump(current_version, kwargs.get("force_level"))
-        new_version = get_new_version(current_version, level_bump)
+        if dev:
+            new_version = master_version + "dev" + build
+            logger.info("Not bumping as this is a dev build.")
+        else:
+            # Calculate the new version
+            level_bump = evaluate_version_bump(master_version, kwargs.get("force_level"))
+            new_version = get_new_version(master_version, level_bump)
+            if beta:
+                new_version = new_version + "b" + build
+
 
     owner, name = get_repository_owner_and_name()
 
