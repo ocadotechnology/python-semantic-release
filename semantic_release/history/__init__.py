@@ -200,7 +200,7 @@ def get_previous_version(version: str) -> Optional[str]:
     :return: A string with the previous version number.
     """
     logger.debug('get_previous_version')
-    if ".dev" in version:
+    if "dev" in version:
         pattern = r'v?(\d+\.\d+\.\d+dev\d+)'
     elif "b" in version:
         pattern = r'v?(\d+\.\d+\.\d+b\d+)'
@@ -220,7 +220,7 @@ def get_previous_version(version: str) -> Optional[str]:
                 logger.debug(f'Version matches regex "{commit_message}"')
                 return matches.group(1).strip()
 
-    if ".dev" in version:
+    if "dev" in version:
         return get_last_dev_version([version, 'v{}'.format(version)])
     elif "b" in version:
         return get_last_beta_version([version, 'v{}'.format(version)])

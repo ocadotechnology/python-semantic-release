@@ -263,19 +263,27 @@ def changelog(*, unreleased=False, noop=False, post=False, **kwargs):
             logger.error("Missing token: cannot post changelog to HVCS")
 
 
+def get_master_version(current_version):
+    if "dev" in current_version:
+        return current_version.split("dev")[0][:-1]
+    elif "b" in current_version:
+        return current_version.split("b")[0]
+    else:
+        return current_version
+
+
 def publish(**kwargs):
     """Run the version task, then push to git and upload to PyPI / GitHub Releases."""
     current_version = get_current_version()
-    dev = "dev" in current_version
-    beta = "b" in current_version
     build = kwargs.get("build")
 
-    if dev:
-        master_version = current_version.split("dev")[0][:-1]
-    elif beta:
-        master_version = current_version.split("b")[0]
-    else:
-        master_version = current_version
+    branch = kwargs.get("branch")
+    if branch is None:
+        branch = config.get("branch")
+
+    deploy_to_dev = kwargs.get("dev")
+
+    master_version = get_master_version(current_version)
 
     retry = kwargs.get("retry")
     if retry:
@@ -283,25 +291,29 @@ def publish(**kwargs):
         # The "new" version will actually be the current version, and the
         # "current" version will be the previous version.
         level_bump = None
-        new_version = master_version
-        master_version = get_previous_version(master_version)
+        new_version = current_version
+        current_version = get_previous_version(current_version)
+        master_version = get_master_version(current_version)
     else:
-        if dev:
+        if deploy_to_dev:
             new_version = master_version + "dev" + build
             logger.info("Not bumping as this is a dev build.")
         else:
-            # Calculate the new version
-            level_bump = evaluate_version_bump(master_version, kwargs.get("force_level"))
-            new_version = get_new_version(master_version, level_bump)
-            if beta:
+            if branch == "development":
+                # Calculate the new version
+                level_bump = evaluate_version_bump(
+                    master_version, kwargs.get("force_level")
+                )
+                new_version = get_new_version(master_version, level_bump)
                 new_version = new_version + "b" + build
-
+            elif branch == "master":
+                new_version = master_version
+            else:
+                logger.info(f"Not publishing non-dev version from {branch}")
+                return
 
     owner, name = get_repository_owner_and_name()
 
-    branch = kwargs.get("branch")
-    if branch is None:
-        branch = config.get("branch")
     logger.debug(f"Running publish on branch {branch}")
     ci_checks.check(branch)
     checkout(branch)
