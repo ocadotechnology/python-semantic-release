@@ -285,12 +285,12 @@ def publish(**kwargs):
 
     master_version = get_master_version(current_version)
 
+    level_bump = None
     retry = kwargs.get("retry")
     if retry:
         logger.info("Retry is on")
         # The "new" version will actually be the current version, and the
         # "current" version will be the previous version.
-        level_bump = None
         new_version = current_version
         current_version = get_previous_version(current_version)
         master_version = get_master_version(current_version)
